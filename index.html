@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>The3650Runner</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05010f; font-family: 'Segoe UI', Arial, sans-serif; }
+  #gameCanvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  #hud {
+    position: fixed; top: 0; left: 0; width: 100%; pointer-events: none;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 18px 22px; z-index: 10;
+  }
+  .hud-box {
+    background: rgba(10, 6, 30, 0.55);
+    border: 1px solid rgba(0, 255, 220, 0.35);
+    border-radius: 12px;
+    padding: 10px 18px;
+    color: #baffef;
+    font-weight: 700;
+    letter-spacing: 1px;
+    box-shadow: 0 0 18px rgba(0,255,220,0.15) inset;
+    backdrop-filter: blur(4px);
+  }
+  #score { font-size: 22px; }
+  #score span, #best span, #speedLbl span { color: #ff5fd1; }
+  #best { font-size: 14px; margin-top: 6px; color: #ffd9f5; opacity: 0.85;}
+
+  #combo {
+    position: fixed; top: 90px; left: 50%; transform: translateX(-50%);
+    font-size: 20px; font-weight: 800; color: #ffe066;
+    text-shadow: 0 0 12px rgba(255,224,102,0.8);
+    opacity: 0; transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none; z-index: 11;
+  }
+  #bonusPopup {
+    position: fixed; top: 130px; left: 50%; transform: translateX(-50%);
+    font-size: 17px; font-weight: 800; color: #7dffb0;
+    text-shadow: 0 0 12px rgba(125,255,176,0.8);
+    opacity: 0; transition: opacity 0.25s;
+    pointer-events: none; z-index: 11;
+  }
+  #powerupBar {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; z-index: 10; pointer-events: none;
+  }
+  .pu-badge {
+    display: none; align-items: center; gap: 6px;
+    background: rgba(10, 6, 30, 0.6);
+    border-radius: 20px; padding: 7px 14px;
+    font-weight: 800; font-size: 13px; color: white;
+    border: 1px solid rgba(255,255,255,0.25);
+  }
+  #shieldBadge { border-color: rgba(63,169,255,0.6); color: #bfe4ff; }
+  #magnetBadge { border-color: rgba(255,157,63,0.6); color: #ffd9b8; }
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(20,5,40,0.75), rgba(2,0,10,0.94));
+    color: white; text-align: center; padding: 20px;
+  }
+  .hidden { display: none !important; }
+  .title {
+    font-size: clamp(32px, 8vw, 64px);
+    font-weight: 900;
+    background: linear-gradient(90deg, #00fff0, #ff4fd8, #ffe066);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 40px rgba(255,79,216,0.35);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  .subtitle { font-size: 16px; opacity: 0.8; margin-bottom: 28px; max-width: 420px; line-height: 1.5;}
+  .btn {
+    pointer-events: all;
+    background: linear-gradient(135deg, #00d9c0, #ff4fd8);
+    border: none; color: white; font-weight: 800; font-size: 18px;
+    padding: 15px 42px; border-radius: 40px; cursor: pointer;
+    box-shadow: 0 6px 24px rgba(255,79,216,0.4);
+    letter-spacing: 1px;
+    transition: transform 0.12s ease;
+  }
+  .btn:active { transform: scale(0.94); }
+  .diff-btn { opacity: 0.5; box-shadow: none; }
+  .diff-btn.selected { opacity: 1; box-shadow: 0 4px 16px rgba(255,79,216,0.4); }
+  .controls-hint {
+    margin-top: 30px; font-size: 13px; opacity: 0.65; line-height: 1.8;
+    display: flex; gap: 22px; flex-wrap: wrap; justify-content: center;
+  }
+  .controls-hint kbd {
+    background: rgba(255,255,255,0.12); border-radius: 5px; padding: 2px 8px;
+    border: 1px solid rgba(255,255,255,0.25); font-family: inherit;
+  }
+  #finalScore { font-size: 46px; font-weight: 900; color: #ffe066; margin: 10px 0 4px; text-shadow: 0 0 20px rgba(255,224,102,0.6);}
+  #newBest { color: #00fff0; font-weight: 800; height: 20px; margin-bottom: 10px;}
+
+  /* Touch controls */
+  #touchControls {
+    position: fixed; bottom: 0; left: 0; width: 100%; z-index: 15;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 4vw 4vh 4vw; pointer-events: none;
+  }
+  .touch-btn {
+    pointer-events: all;
+    width: 68px; height: 68px; border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(0,255,220,0.5);
+    color: #baffef; font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+    user-select: none;
+  }
+  .touch-btn:active { background: rgba(0,255,220,0.35); }
+  #jumpBtn {
+    width: 84px; height: 84px; border-color: rgba(255,79,216,0.6); color: #ffd9f5;
+    font-size: 15px; font-weight: 800;
+  }
+  #buildTag {
+    position: fixed; bottom: 6px; left: 8px; z-index: 30;
+    font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 1px; pointer-events: none;
+  }
+  @media (min-width: 900px) { #touchControls { display: none; } }
+
+  /* ---------- Tension vignette (rises with speed) ---------- */
+  #tensionVignette {
+    position: fixed; inset: 0; z-index: 9; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(255,0,60,0) 55%, rgba(255,0,60,0.55) 100%);
+    opacity: 0; transition: opacity 0.4s ease;
+  }
+
+  /* ---------- Near-miss close-call flash ---------- */
+  #closeCallFlash {
+    position: fixed; inset: 0; z-index: 9; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 65%);
+    opacity: 0;
+  }
+  #closeCallFlash.flash { animation: flashPulse 0.35s ease-out; }
+  @keyframes flashPulse { 0% { opacity: 0.9; } 100% { opacity: 0; } }
+
+  /* ---------- Two player split screen ---------- */
+  #splitUI { position: fixed; inset: 0; z-index: 5; }
+  .split-canvas {
+    position: fixed; top: 0; width: 50%; height: 100%; display: block; background: #05010f;
+  }
+  #gameCanvasP1 { left: 0; }
+  #gameCanvasP2 { left: 50%; }
+  #splitDivider {
+    position: fixed; top: 0; left: 50%; width: 3px; height: 100%;
+    background: linear-gradient(180deg, #00fff0, #ff4fd8);
+    box-shadow: 0 0 12px rgba(255,79,216,0.6);
+    z-index: 8; transform: translateX(-50%); pointer-events: none;
+  }
+  .mini-hud {
+    position: fixed; top: 14px; z-index: 9; pointer-events: none;
+    background: rgba(10,6,30,0.6); border: 1px solid rgba(0,255,220,0.35);
+    border-radius: 10px; padding: 8px 14px; color: #baffef; font-weight: 700; font-size: 13px;
+  }
+  #miniHudP1 { left: 14px; }
+  #miniHudP2 { right: 14px; text-align: right; }
+  .mini-hud .mh-name { font-size: 11px; opacity: 0.7; letter-spacing: 1px; }
+  .mini-hud .mh-score { font-size: 19px; color: white; }
+  .mini-hud .mh-coins { color: #ffd700; }
+  .out-banner {
+    position: fixed; top: 45%; width: 50%; z-index: 9; text-align: center;
+    font-size: 26px; font-weight: 900; color: #ff5a5a; text-shadow: 0 0 14px rgba(255,90,90,0.7);
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  }
+  #outP1 { left: 0; } #outP2 { left: 50%; }
+  .mode-btn { padding: 10px 22px; font-size: 14px; opacity: 0.5; box-shadow: none; }
+  .mode-btn.selected { opacity: 1; box-shadow: 0 4px 16px rgba(255,79,216,0.4); }
+
+  /* ---------- Shop ---------- */
+  .shop-tab { opacity: 0.5; box-shadow: none; background: rgba(255,255,255,0.08); }
+  .shop-tab.selected { opacity: 1; background: linear-gradient(135deg,#00d9c0,#ff4fd8); box-shadow: 0 4px 14px rgba(255,79,216,0.35); }
+  #shopGrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px; width: min(94vw, 780px); pointer-events: all;
+  }
+  .shop-card {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 14px; padding: 14px 10px; display: flex; flex-direction: column;
+    align-items: center; gap: 8px; text-align: center;
+  }
+  .shop-card.owned { border-color: rgba(0,255,220,0.5); background: rgba(0,255,220,0.06); }
+  .shop-card.equipped { border-color: #ffd700; box-shadow: 0 0 14px rgba(255,215,0,0.35); }
+  .shop-swatch {
+    width: 46px; height: 46px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3);
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+  .shop-name { font-size: 12.5px; font-weight: 800; color: white; line-height: 1.25; min-height: 30px; }
+  .shop-price { font-size: 12px; font-weight: 700; color: #ffd700; }
+  .shop-buy-btn {
+    width: 100%; border: none; border-radius: 20px; padding: 7px 0; font-weight: 800; font-size: 11.5px;
+    cursor: pointer; letter-spacing: 0.5px;
+  }
+  .shop-buy-btn.can-buy { background: linear-gradient(135deg,#00d9c0,#ff4fd8); color: white; }
+  .shop-buy-btn.locked { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); cursor: not-allowed; }
+  .shop-buy-btn.equip { background: rgba(0,255,220,0.15); color: #00fff0; border: 1px solid rgba(0,255,220,0.4); }
+  .shop-buy-btn.equipped-tag { background: rgba(255,215,0,0.18); color: #ffd700; border: 1px solid rgba(255,215,0,0.5); cursor: default; }
+  .shop-buy-btn.owned-tag { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.55); cursor: default; }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<div id="buildTag">BUILD v14 — fixed full-body skin recolor</div>
+<div id="tensionVignette"></div>
+<div id="closeCallFlash"></div>
+
+<div id="hud">
+  <div class="hud-box">
+    <div id="score">SCORE <span id="scoreVal">0</span></div>
+    <div id="best">BEST <span id="bestVal">0</span> · <span id="diffVal">NORMAL</span></div>
+    <div id="coinRow" style="margin-top:6px; font-size:15px; color:#ffe066;">🪙 <span id="coinHudVal">0</span></div>
+  </div>
+  <div class="hud-box" id="speedLbl">SPEED <span id="speedVal">1.0x</span><br><span style="font-size:11px;opacity:0.7;">ZONE <span id="zoneVal">1</span></span></div>
+</div>
+<button id="muteBtn" class="hud-box" style="position:fixed; top:18px; right:18px; z-index:12; pointer-events:all; cursor:pointer; font-size:18px; margin-top:64px;">🔊</button>
+<div id="powerupBar">
+  <div class="pu-badge" id="shieldBadge">🛡️ SHIELD</div>
+  <div class="pu-badge" id="magnetBadge">🧲 <span id="magnetTimeVal">0</span>s</div>
+</div>
+<div id="combo">COMBO x1</div>
+<div id="bonusPopup">+5</div>
+
+<div id="touchControls">
+  <div class="touch-btn" id="leftBtn">◀</div>
+  <div class="touch-btn" id="jumpBtn">JUMP</div>
+  <div class="touch-btn" id="rightBtn">▶</div>
+</div>
+
+<div class="overlay" id="startScreen">
+  <div class="title">THE3650RUNNER</div>
+  <div class="subtitle">Sprint through the grid, dodge the crates, hurdle the barriers, and grab every coin you can. Snag shields and magnets, chain combos, and push through zones that shift the world's colors around you. The track never ends — how far can you go?</div>
+  <div id="startTaunt" style="font-size:13px; color:#ff5fd1; opacity:0.85; margin-top:-14px; margin-bottom:20px; font-weight:700; letter-spacing:0.5px;">🏆 There's no chance you're hitting a 100,000 high score. Prove it wrong.</div>
+  <div style="display:flex; gap:10px; margin-bottom:22px;">
+    <button class="btn diff-btn" data-diff="easy" style="padding:10px 22px; font-size:14px; background:linear-gradient(135deg,#2a2a2a,#444);">EASY</button>
+    <button class="btn diff-btn selected" data-diff="normal" style="padding:10px 22px; font-size:14px;">NORMAL</button>
+    <button class="btn diff-btn" data-diff="hard" style="padding:10px 22px; font-size:14px; background:linear-gradient(135deg,#8a1a1a,#c9296b);">HARD</button>
+  </div>
+  <button class="btn" id="startBtn">▶ START RUN</button>
+  <button class="btn" id="openShopBtn" style="margin-top:12px; background:linear-gradient(135deg,#ffd700,#ff8c3f); font-size:14px; padding:10px 26px;">🛒 SHOP · <span id="walletValStart">0</span> 🪙</button>
+  <div class="controls-hint">
+    <span><kbd>A</kbd>/<kbd>◀</kbd> move left</span>
+    <span><kbd>D</kbd>/<kbd>▶</kbd> move right</span>
+    <span><kbd>SPACE</kbd>/<kbd>▲</kbd> jump</span>
+    <span>or swipe / tap on mobile</span>
+  </div>
+  <div class="controls-hint" style="margin-top:4px;">
+    <span>🛡️ shield blocks one hit</span>
+    <span>🧲 magnet pulls in coins</span>
+  </div>
+</div>
+
+<div class="overlay hidden" id="gameOverScreen">
+  <div class="title" style="font-size:clamp(26px,6vw,42px)">RUN OVER</div>
+  <div id="finalScore">0</div>
+  <div id="newBest"></div>
+  <div id="gameOverTaunt" style="font-size:12px; color:#ff5fd1; opacity:0.8; font-weight:700; margin-bottom:6px;">🏆 still no chance you're touching 100,000</div>
+  <div class="controls-hint" style="margin-top:2px; margin-bottom:8px;">
+    <span>DISTANCE <b id="finalDist" style="color:#00fff0;">0m</b></span>
+    <span>BEST COMBO <b id="finalCombo" style="color:#ffe066;">x1</b></span>
+  </div>
+  <div class="controls-hint" style="margin-top:0; margin-bottom:14px;">
+    <span>🪙 THIS RUN <b id="finalCoins" style="color:#ffd700;">0</b></span>
+    <span>🪙 SESSION TOTAL <b id="totalCoinsVal" style="color:#ffd700;">0</b></span>
+    <span>🪙 BEST RUN <b id="bestCoinsVal" style="color:#ffd700;">0</b></span>
+  </div>
+  <div style="font-size:12px; opacity:0.6; letter-spacing:1px; margin-bottom:8px;">CHOOSE DIFFICULTY</div>
+  <div style="display:flex; gap:10px; margin-bottom:22px;">
+    <button class="btn diff-btn" data-diff="easy" style="padding:10px 22px; font-size:14px; background:linear-gradient(135deg,#2a2a2a,#444);">EASY</button>
+    <button class="btn diff-btn" data-diff="normal" style="padding:10px 22px; font-size:14px;">NORMAL</button>
+    <button class="btn diff-btn" data-diff="hard" style="padding:10px 22px; font-size:14px; background:linear-gradient(135deg,#8a1a1a,#c9296b);">HARD</button>
+  </div>
+  <button class="btn" id="restartBtn">↻ RUN AGAIN</button>
+  <button class="btn" id="openShopBtnGO" style="margin-top:12px; background:linear-gradient(135deg,#ffd700,#ff8c3f); font-size:13px; padding:8px 22px;">🛒 SHOP · <span id="walletValGO">0</span> 🪙</button>
+</div>
+
+<div class="overlay hidden" id="shopScreen" style="justify-content:flex-start; padding-top:4vh; overflow-y:auto;">
+  <div style="display:flex; align-items:center; gap:16px; margin-bottom:6px;">
+    <div class="title" style="font-size:clamp(24px,5vw,38px);">SHOP</div>
+  </div>
+  <div style="font-size:16px; font-weight:800; color:#ffd700; margin-bottom:16px;">🪙 WALLET: <span id="shopWalletVal">0</span></div>
+  <div id="shopTabs" style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:18px;">
+    <button class="btn shop-tab selected" data-cat="skin" style="padding:8px 16px; font-size:12px;">👕 SKINS</button>
+    <button class="btn shop-tab" data-cat="trail" style="padding:8px 16px; font-size:12px;">✨ TRAILS</button>
+    <button class="btn shop-tab" data-cat="hat" style="padding:8px 16px; font-size:12px;">🎩 HATS</button>
+    <button class="btn shop-tab" data-cat="theme" style="padding:8px 16px; font-size:12px;">🌆 THEMES</button>
+    <button class="btn shop-tab" data-cat="perk" style="padding:8px 16px; font-size:12px;">⚡ PERKS</button>
+  </div>
+  <div id="shopGrid"></div>
+  <button class="btn" id="closeShopBtn" style="margin-top:24px; margin-bottom:20px; background:linear-gradient(135deg,#2a2a2a,#444); font-size:14px;">← BACK</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ---------- Core setup ----------
+  const canvas = document.getElementById('gameCanvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0620);
+  scene.fog = new THREE.Fog(0x0a0620, 18, 70);
+
+  const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 200);
+
+  function resize() {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- Lighting ----------
+  const ambient = new THREE.AmbientLight(0x8899ff, 0.55);
+  scene.add(ambient);
+
+  const hemi = new THREE.HemisphereLight(0x66e0ff, 0x1a0630, 0.6);
+  scene.add(hemi);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+  dirLight.position.set(-6, 14, 8);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  dirLight.shadow.camera.left = -15;
+  dirLight.shadow.camera.right = 15;
+  dirLight.shadow.camera.top = 15;
+  dirLight.shadow.camera.bottom = -15;
+  dirLight.shadow.camera.far = 40;
+  scene.add(dirLight);
+
+  const pinkLight = new THREE.PointLight(0xff4fd8, 1.2, 20);
+  pinkLight.position.set(0, 4, -4);
+  scene.add(pinkLight);
+
+  // ---------- Lanes ----------
+  const LANE_X = [-2.6, 0, 2.6];
+  const LANE_COUNT = 3;
+
+  // ---------- Sound engine (procedural, no assets needed) ----------
+  let audioCtx = null;
+  let muted = false;
+  function ensureAudio() {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      else if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) { /* audio unavailable, fail silently */ }
+  }
+  function beep(freq, duration, type, volume, delay) {
+    if (!audioCtx || muted) return;
+    const t0 = audioCtx.currentTime + (delay || 0);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(volume || 0.2, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.03);
+  }
+  function sndJump() { beep(420, 0.11, 'square', 0.13); beep(640, 0.09, 'square', 0.09, 0.03); }
+  function sndCoin() { beep(880, 0.07, 'triangle', 0.16); beep(1320, 0.08, 'triangle', 0.13, 0.05); }
+  function sndCrash() { beep(130, 0.3, 'sawtooth', 0.22); beep(85, 0.35, 'sawtooth', 0.18, 0.05); }
+  function sndPowerup() { beep(500, 0.08, 'sine', 0.16); beep(750, 0.08, 'sine', 0.14, 0.06); beep(1050, 0.12, 'sine', 0.13, 0.12); }
+  function sndBonus() { beep(700, 0.09, 'triangle', 0.14); }
+  function sndNearMiss() { beep(200, 0.05, 'square', 0.1); beep(950, 0.14, 'sine', 0.15, 0.04); }
+
+  // ---------- Zone color palettes ----------
+  const ZONE_PALETTES = [
+    { bg: 0x0a0620, accent: 0xff4fd8 },
+    { bg: 0x061428, accent: 0x00e5ff },
+    { bg: 0x1a0a05, accent: 0xffa53f },
+    { bg: 0x0a1a08, accent: 0x7dff4f },
+    { bg: 0x1a0824, accent: 0xff5f7d },
+  ];
+  const curBG = new THREE.Color(ZONE_PALETTES[0].bg);
+  const curAccent = new THREE.Color(ZONE_PALETTES[0].accent);
+  const sharedRailMat = new THREE.MeshStandardMaterial({ color: 0xff4fd8, emissive: 0xff2fc0, emissiveIntensity: 0.6 });
+
+  // ---------- Ground (recycled tiles) ----------
+  const TILE_LEN = 12;
+  const TILE_COUNT = 8;
+  const groundTiles = [];
+  const groundMatA = new THREE.MeshStandardMaterial({ color: 0x1c1440, roughness: 0.85, metalness: 0.1 });
+  const groundMatB = new THREE.MeshStandardMaterial({ color: 0x241a52, roughness: 0.85, metalness: 0.1 });
+
+  for (let i = 0; i < TILE_COUNT; i++) {
+    const geo = new THREE.BoxGeometry(9, 0.4, TILE_LEN);
+    const mesh = new THREE.Mesh(geo, i % 2 === 0 ? groundMatA : groundMatB);
+    mesh.position.set(0, -0.2, -i * TILE_LEN);
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    groundTiles.push(mesh);
+
+    // neon lane-divider strips
+    [-1.3, 1.3].forEach((lx) => {
+      const stripGeo = new THREE.BoxGeometry(0.08, 0.02, TILE_LEN * 0.9);
+      const stripMat = new THREE.MeshBasicMaterial({ color: 0x00fff0, transparent: true, opacity: 0.55 });
+      const strip = new THREE.Mesh(stripGeo, stripMat);
+      strip.position.set(lx, 0.01, mesh.position.z);
+      mesh.userData.strips = mesh.userData.strips || [];
+      mesh.userData.strips.push(strip);
+      scene.add(strip);
+    });
+
+    // side glow rails
+    [-4.6, 4.6].forEach((sx) => {
+      const railGeo = new THREE.BoxGeometry(0.15, 0.5, TILE_LEN);
+      const rail = new THREE.Mesh(railGeo, sharedRailMat);
+      rail.position.set(sx, 0.05, mesh.position.z);
+      mesh.userData.rails = mesh.userData.rails || [];
+      mesh.userData.rails.push(rail);
+      scene.add(rail);
+    });
+  }
+
+  function recycleGround(playerZ) {
+    groundTiles.forEach((tile) => {
+      if (tile.position.z - playerZ > TILE_LEN) {
+        tile.position.z -= TILE_LEN * TILE_COUNT;
+        (tile.userData.strips || []).forEach(s => s.position.z = tile.position.z);
+        (tile.userData.rails || []).forEach(r => r.position.z = tile.position.z);
+      }
+    });
+  }
+
+  // ---------- Distant skyline (decorative) ----------
+  const skylineGroup = new THREE.Group();
+  for (let i = 0; i < 40; i++) {
+    const h = 4 + Math.random() * 14;
+    const w = 1.5 + Math.random() * 2.5;
+    const geo = new THREE.BoxGeometry(w, h, w);
+    const colorChoices = [0x2a1660, 0x1a0f45, 0x3a1a5c];
+    const mat = new THREE.MeshStandardMaterial({
+      color: colorChoices[Math.floor(Math.random() * colorChoices.length)],
+      emissive: 0x110033, emissiveIntensity: 0.3
+    });
+    const bld = new THREE.Mesh(geo, mat);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    bld.position.set(side * (16 + Math.random() * 20), h / 2 - 0.5, -Math.random() * 120);
+    skylineGroup.add(bld);
+  }
+  scene.add(skylineGroup);
+
+  // ---------- Player character ----------
+  const player = new THREE.Group();
+  const skin = new THREE.MeshStandardMaterial({ color: 0xffc98b, roughness: 0.6 });
+  const suit = new THREE.MeshStandardMaterial({ color: 0x00d9c0, emissive: 0x00453d, emissiveIntensity: 0.5, roughness: 0.4 });
+  const suitDark = new THREE.MeshStandardMaterial({ color: 0x0a2e2a, roughness: 0.5 });
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.35), suit);
+  torso.position.y = 1.05;
+  torso.castShadow = true;
+  player.add(torso);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), skin);
+  head.position.y = 1.65;
+  head.castShadow = true;
+  player.add(head);
+
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.05), new THREE.MeshBasicMaterial({ color: 0xff4fd8 }));
+  visor.position.set(0, 1.67, 0.26);
+  player.add(visor);
+
+  // ---------- Hats (shop cosmetics) ----------
+  const hatMount = new THREE.Group();
+  hatMount.position.y = 1.78;
+  player.add(hatMount);
+  const hatMeshes = {};
+
+  function buildHat(id) {
+    const g = new THREE.Group();
+    if (id === 'hat_cap') {
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.29, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2255ff }));
+      dome.position.y = 0.02;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 12), new THREE.MeshStandardMaterial({ color: 0x2255ff }));
+      brim.position.set(0, -0.01, 0.2);
+      g.add(dome, brim);
+    } else if (id === 'hat_headphones') {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.03, 8, 16, Math.PI), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+      band.rotation.z = Math.PI;
+      band.position.y = 0.08;
+      const cupL = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 12), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+      cupL.rotation.z = Math.PI / 2; cupL.position.set(-0.3, -0.03, 0);
+      const cupR = cupL.clone(); cupR.position.x = 0.3;
+      g.add(band, cupL, cupR);
+    } else if (id === 'hat_party') {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.45, 12), new THREE.MeshStandardMaterial({ color: 0xff4fd8 }));
+      cone.position.y = 0.24;
+      const pom = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffe066 }));
+      pom.position.y = 0.47;
+      g.add(cone, pom);
+    } else if (id === 'hat_halo') {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.03, 10, 20), new THREE.MeshBasicMaterial({ color: 0xffe066 }));
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 0.32;
+      g.add(ring);
+    } else if (id === 'hat_crown') {
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.16, 8), new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x553d00, emissiveIntensity: 0.5, metalness: 0.6, roughness: 0.3 }));
+      base.position.y = 0.1;
+      g.add(base);
+      for (let i = 0; i < 6; i++) {
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 6), new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x553d00, emissiveIntensity: 0.5 }));
+        const a = (i / 6) * Math.PI * 2;
+        spike.position.set(Math.cos(a) * 0.22, 0.24, Math.sin(a) * 0.22);
+        g.add(spike);
+      }
+    }
+    return g;
+  }
+  ['hat_cap', 'hat_headphones', 'hat_party', 'hat_halo', 'hat_crown'].forEach((id) => {
+    const mesh = buildHat(id);
+    mesh.visible = false;
+    hatMount.add(mesh);
+    hatMeshes[id] = mesh;
+  });
+  function applyHat(id) {
+    Object.values(hatMeshes).forEach(m => m.visible = false);
+    if (hatMeshes[id]) hatMeshes[id].visible = true;
+  }
+
+  function makeLimb(mat, len) {
+    const g = new THREE.Mesh(new THREE.BoxGeometry(0.18, len, 0.18), mat);
+    g.castShadow = true;
+    return g;
+  }
+  const armL = makeLimb(suitDark, 0.55); armL.position.set(-0.42, 1.05, 0);
+  const armR = makeLimb(suitDark, 0.55); armR.position.set(0.42, 1.05, 0);
+  const legL = makeLimb(suitDark, 0.6); legL.position.set(-0.17, 0.45, 0);
+  const legR = makeLimb(suitDark, 0.6); legR.position.set(0.17, 0.45, 0);
+  player.add(armL, armR, legL, legR);
+
+  const armPivotL = new THREE.Group(); armPivotL.position.set(-0.42, 1.32, 0); armL.position.set(0,-0.27,0); armPivotL.add(armL);
+  const armPivotR = new THREE.Group(); armPivotR.position.set(0.42, 1.32, 0); armR.position.set(0,-0.27,0); armPivotR.add(armR);
+  const legPivotL = new THREE.Group(); legPivotL.position.set(-0.17, 0.75, 0); legL.position.set(0,-0.3,0); legPivotL.add(legL);
+  const legPivotR = new THREE.Group(); legPivotR.position.set(0.17, 0.75, 0); legR.position.set(0,-0.3,0); legPivotR.add(legR);
+  player.remove(armL, armR, legL, legR);
+  player.add(armPivotL, armPivotR, legPivotL, legPivotR);
+
+  const shieldMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(1.05, 20, 20),
+    new THREE.MeshBasicMaterial({ color: 0x3fa9ff, transparent: true, opacity: 0.28 })
+  );
+  shieldMesh.position.y = 1.0;
+  shieldMesh.visible = false;
+  player.add(shieldMesh);
+
+  player.position.set(0, 0, 0);
+  scene.add(player);
+
+  // ---------- Mute toggle ----------
+  const muteBtn = document.getElementById('muteBtn');
+  muteBtn.addEventListener('click', () => {
+    muted = !muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+  });
+
+  // ---------- Difficulty selection ----------
+  const DIFFICULTIES = {
+    easy:   { label: 'EASY',   baseSpeed: 0.105, spawnGap: 13.5, rampRate: 0.00014, hurdleChance: 0.45, doubleChance: 0.15 },
+    normal: { label: 'NORMAL', baseSpeed: 0.16,  spawnGap: 9,    rampRate: 0.00035, hurdleChance: 0.32, doubleChance: 0.35 },
+    hard:   { label: 'HARD',   baseSpeed: 0.25,  spawnGap: 5.8,  rampRate: 0.00065, hurdleChance: 0.24, doubleChance: 0.55 }
+  };
+  let difficulty = DIFFICULTIES.normal;
+  function selectDifficulty(key) {
+    difficulty = DIFFICULTIES[key];
+    document.querySelectorAll('.diff-btn').forEach((b) => {
+      b.classList.toggle('selected', b.dataset.diff === key);
+    });
+  }
+  document.querySelectorAll('.diff-btn').forEach((btn) => {
+    btn.addEventListener('click', () => selectDifficulty(btn.dataset.diff));
+  });
+  selectDifficulty('normal'); // default, reflected on both screens from the start
+
+  // ---------- Game state ----------
+  let running = false;
+  let gameOver = false;
+  // ---------- Taunts ----------
+  const TAUNTS = [
+    "🏆 There's no chance you're hitting a 100,000 high score. Prove it wrong.",
+    "😏 100,000? Not happening. But go ahead, try.",
+    "🔥 Most people fold before 10,000. You're not most people... right?",
+    "🐌 Betting you crash before the first zone change.",
+    "💀 100k is a myth told to scare new players.",
+    "🎯 Half the coins, twice the confidence — let's see it.",
+    "🧊 Cold streak incoming. Warm up those thumbs.",
+    "🚧 The crates already know your lane before you do.",
+    "⏱️ Distance record's just sitting there, undefended.",
+    "🙃 Statistically, you're about to lose in the next 20 seconds."
+  ];
+  function randomTaunt(excludeText) {
+    let pick;
+    do { pick = TAUNTS[Math.floor(Math.random() * TAUNTS.length)]; }
+    while (pick === excludeText && TAUNTS.length > 1);
+    return pick;
+  }
+  const startTauntEl = document.getElementById('startTaunt');
+  const gameOverTauntEl = document.getElementById('gameOverTaunt');
+  startTauntEl.textContent = randomTaunt();
+
+  let bestDistance = 0;
+  let bestCombo = 1;
+  let runCoins = 0;           // coins collected in the current run
+  let totalCoinsCollected = 0; // coins collected across all runs this session
+  let bestRunCoins = 0;       // most coins collected in a single run this session
+  let nextMilestone = 250;
+
+  // ---------- Shop ----------
+  let coinWallet = 0;          // spendable currency (separate from the lifetime stat above)
+  let coinMultiplier = 1;      // boosted by coin-boost perks
+
+  const SHOP_ITEMS = [
+    // --- Skins (recolor the runner) ---
+    { id: 'skin_classic', category: 'skin', name: 'Classic Cyan', price: 0, icon: '👕', color: 0x00d9c0 },
+    { id: 'skin_crimson', category: 'skin', name: 'Crimson Red', price: 500, icon: '👕', color: 0xff3b3b },
+    { id: 'skin_toxic', category: 'skin', name: 'Toxic Green', price: 800, icon: '👕', color: 0x39ff6a },
+    { id: 'skin_royal', category: 'skin', name: 'Royal Purple', price: 1200, icon: '👕', color: 0x9b3fff },
+    { id: 'skin_sunset', category: 'skin', name: 'Sunset Orange', price: 1800, icon: '👕', color: 0xff8c3f },
+    { id: 'skin_ocean', category: 'skin', name: 'Ocean Blue', price: 2500, icon: '👕', color: 0x3f8cff },
+    { id: 'skin_shadow', category: 'skin', name: 'Shadow Black', price: 4000, icon: '👕', color: 0x1a1a1a },
+    { id: 'skin_chrome', category: 'skin', name: 'Silver Chrome', price: 6000, icon: '👕', color: 0xd8d8e0 },
+    { id: 'skin_rainbow', category: 'skin', name: 'Rainbow Shift', price: 15000, icon: '🌈', color: 0xff4fd8 },
+    { id: 'skin_golden', category: 'skin', name: 'GOLDEN GOD', price: 1000000, icon: '👑', color: 0xffd700 },
+
+    // --- Trails (particles behind the runner) ---
+    { id: 'trail_none', category: 'trail', name: 'No Trail', price: 0, icon: '⬛', color: 0x666666 },
+    { id: 'trail_spark', category: 'trail', name: 'Spark Trail', price: 700, icon: '✨', color: 0xffe066 },
+    { id: 'trail_bubble', category: 'trail', name: 'Bubble Trail', price: 1500, icon: '💧', color: 0x66d9ff },
+    { id: 'trail_fire', category: 'trail', name: 'Fire Trail', price: 3000, icon: '🔥', color: 0xff5a2a },
+    { id: 'trail_ice', category: 'trail', name: 'Ice Trail', price: 5000, icon: '❄️', color: 0xaeefff },
+    { id: 'trail_galaxy', category: 'trail', name: 'Galaxy Trail', price: 20000, icon: '🌌', color: 0xb266ff },
+
+    // --- Hats (head accessories) ---
+    { id: 'hat_none', category: 'hat', name: 'No Hat', price: 0, icon: '🚫' },
+    { id: 'hat_cap', category: 'hat', name: 'Cap', price: 400, icon: '🧢' },
+    { id: 'hat_headphones', category: 'hat', name: 'Headphones', price: 900, icon: '🎧' },
+    { id: 'hat_party', category: 'hat', name: 'Party Hat', price: 1000, icon: '🎉' },
+    { id: 'hat_halo', category: 'hat', name: 'Halo', price: 2000, icon: '😇' },
+    { id: 'hat_crown', category: 'hat', name: 'Crown', price: 10000, icon: '👑' },
+
+    // --- Themes (world color palette) ---
+    { id: 'theme_default', category: 'theme', name: 'Default Neon', price: 0, icon: '🌆' },
+    { id: 'theme_sunset', category: 'theme', name: 'Sunset Vibes', price: 3500, icon: '🌇' },
+    { id: 'theme_noir', category: 'theme', name: 'Monochrome Noir', price: 6000, icon: '🌑' },
+
+    // --- Perks (permanent gameplay upgrades) ---
+    { id: 'perk_headstart', category: 'perk', name: 'Head Start Shield', price: 5000, icon: '🛡️', desc: 'Start every run with a free shield.' },
+    { id: 'perk_coinboost10', category: 'perk', name: 'Coin Boost +10%', price: 8000, icon: '🪙', desc: 'Earn 10% more coins, permanently.' },
+    { id: 'perk_coinboost25', category: 'perk', name: 'Coin Boost +25%', price: 25000, icon: '💰', desc: 'Earn 25% more coins, permanently (replaces +10%).' },
+    { id: 'perk_extralife', category: 'perk', name: 'Extra Life', price: 50000, icon: '💖', desc: 'Survive one crash per run automatically.' },
+    { id: 'perk_magnetrange', category: 'perk', name: 'Magnet Range +50%', price: 12000, icon: '🧲', desc: 'Your magnet power-up pulls coins from further away.' },
+  ];
+
+  const THEME_PALETTES = {
+    theme_sunset: [{ bg: 0x2a0f05, accent: 0xff8c3f }, { bg: 0x3d1a0a, accent: 0xffcf3f }],
+    theme_noir: [{ bg: 0x0a0a0a, accent: 0xcccccc }, { bg: 0x141414, accent: 0x999999 }],
+  };
+
+  let ownedItems = new Set(['skin_classic', 'trail_none', 'hat_none', 'theme_default']);
+  let ownedPerks = new Set();
+  let equipped = { skin: 'skin_classic', trail: 'trail_none', hat: 'hat_none', theme: 'theme_default' };
+  let activeShopTab = 'skin';
+  let currentLane = 1;
+  let targetX = LANE_X[currentLane];
+  let playerZ = 0;
+  let velY = 0;
+  let grounded = true;
+  const GRAVITY = -0.028;          // original, snappy fall/rise — unchanged from the first version
+  const JUMP_FORCE = 0.30;         // clearly taller now (~1.6 units peak) — big enough to unmistakably clear every obstacle
+  const APEX_HANG_VEL = 0.095;     // wider velocity band counted as "near the top"
+  const APEX_GRAVITY_SCALE = 0.32; // stronger float at the peak so the arc reads as smooth and even, not a quick hop
+  const COLLISION_FORGIVENESS = 0.06; // small buffer that favors the player on close calls
+  const PLAYER_HEIGHT = 1.9;
+
+  let baseSpeed = difficulty.baseSpeed;
+  let speed = baseSpeed;
+  let distance = 0;
+  let score = 0;
+  let coinScore = 0;      // bonus points from coins, near-misses, cleared obstacles
+  let best = 0;
+  let combo = 1;
+  let comboTimer = 0;
+  let runTime = 0;
+  let shakeTime = 0;
+  let currentZone = 0;
+  let crashing = false;       // true during the brief cinematic beat right after a crash
+  let timeScale = 1;          // global sim speed multiplier — dips during slow-mo moments
+  let slowMoTimer = 0;        // seconds remaining in the current slow-mo effect
+  let deathCamTimer = 0;      // brief cinematic hang after a crash, before the game-over screen
+  const tensionVignette = document.getElementById('tensionVignette');
+  const closeCallFlash = document.getElementById('closeCallFlash');
+
+  // power-ups
+  let shieldActive = false;
+  let extraLifeAvailable = false; // set true each run if the extra-life perk is owned
+  let magnetTimer = 0;
+  const MAGNET_RADIUS_BASE = 3.4;
+  function currentMagnetRadius() { return MAGNET_RADIUS_BASE * (ownedPerks.has('perk_magnetrange') ? 1.5 : 1); }
+  const powerups = [];
+  const particles = [];
+  let trailTimer = 0; // throttles trail particle spawn rate
+
+  function applySkin(id) {
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    if (!item) return;
+    if (id === 'skin_golden') {
+      suit.color.setHex(0xffd700);
+      suit.emissive.setHex(0x554400);
+      suit.emissiveIntensity = 0.9;
+      suitDark.color.setHex(0x8a6d00);
+    } else if (id === 'skin_rainbow') {
+      suit.emissiveIntensity = 0.6; // hue is animated live in the render loop
+      suitDark.color.setHex(0x333333);
+    } else {
+      suit.color.setHex(item.color);
+      suit.emissive.setHex(0x111111);
+      suit.emissiveIntensity = 0.35;
+      // limbs get a darkened version of the same color so the whole body
+      // shifts together instead of just the torso
+      const c = new THREE.Color(item.color).multiplyScalar(0.35);
+      suitDark.color.copy(c);
+    }
+  }
+
+  function getActivePalette(zoneIndex) {
+    const themePalette = THEME_PALETTES[equipped.theme];
+    if (themePalette) return themePalette[zoneIndex % themePalette.length];
+    return ZONE_PALETTES[zoneIndex % ZONE_PALETTES.length];
+  }
+
+  function spawnTrailParticle() {
+    const item = SHOP_ITEMS.find(i => i.id === equipped.trail);
+    if (!item || equipped.trail === 'trail_none') return;
+    const pos = player.position.clone();
+    pos.y += 0.15;
+    pos.z += 0.3;
+    spawnBurst(pos, item.color, 1, 0.05);
+  }
+
+
+  const scoreVal = document.getElementById('scoreVal');
+  const bestVal = document.getElementById('bestVal');
+  const speedVal = document.getElementById('speedVal');
+  const coinHudEl = document.getElementById('coinHudVal');
+  const zoneVal = document.getElementById('zoneVal');
+  const comboEl = document.getElementById('combo');
+  const bonusPopup = document.getElementById('bonusPopup');
+  const shieldBadge = document.getElementById('shieldBadge');
+  const magnetBadge = document.getElementById('magnetBadge');
+  const magnetTimeVal = document.getElementById('magnetTimeVal');
+
+  function updatePowerupHUD() {
+    shieldBadge.style.display = shieldActive ? 'flex' : 'none';
+    magnetBadge.style.display = magnetTimer > 0 ? 'flex' : 'none';
+    if (magnetTimer > 0) magnetTimeVal.textContent = Math.ceil(magnetTimer);
+  }
+
+  let bonusFadeTimeout = null;
+  function showBonus(text) {
+    bonusPopup.textContent = text;
+    bonusPopup.style.opacity = '1';
+    clearTimeout(bonusFadeTimeout);
+    bonusFadeTimeout = setTimeout(() => { bonusPopup.style.opacity = '0'; }, 700);
+  }
+
+  function spawnBurst(pos, color, count, spread) {
+    for (let i = 0; i < (count || 10); i++) {
+      const geo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+      const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1 });
+      const p = new THREE.Mesh(geo, mat);
+      p.position.copy(pos);
+      const sp = spread || 0.12;
+      p.userData.vel = new THREE.Vector3((Math.random() - 0.5) * sp, Math.random() * sp + 0.05, (Math.random() - 0.5) * sp);
+      p.userData.life = 0.55 + Math.random() * 0.3;
+      p.userData.age = 0;
+      scene.add(p);
+      particles.push(p);
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.userData.age += dt / 60;
+      p.position.x += p.userData.vel.x * dt;
+      p.position.y += p.userData.vel.y * dt;
+      p.position.z += p.userData.vel.z * dt;
+      p.userData.vel.y -= 0.01 * dt;
+      const lifeRatio = Math.max(0, 1 - p.userData.age / p.userData.life);
+      p.material.opacity = lifeRatio;
+      p.scale.setScalar(Math.max(0.001, lifeRatio));
+      if (p.userData.age > p.userData.life) {
+        scene.remove(p);
+        particles.splice(i, 1);
+      }
+    }
+  }
+
+  // ---------- Obstacles & coins ----------
+  const obstacles = [];
+  const coins = [];
+  let nextSpawnZ = -14;
+
+  const crateMat = new THREE.MeshStandardMaterial({ color: 0xff5a5a, emissive: 0x551010, roughness: 0.5 });
+  const hurdleMat = new THREE.MeshStandardMaterial({ color: 0xffe066, emissive: 0x554400, roughness: 0.4 });
+  const coinMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x554400, metalness: 0.6, roughness: 0.25 });
+  const shieldPickupMat = new THREE.MeshStandardMaterial({ color: 0x3fa9ff, emissive: 0x1f5fae, emissiveIntensity: 0.8, metalness: 0.3, roughness: 0.3 });
+  const magnetPickupMat = new THREE.MeshStandardMaterial({ color: 0xff9d3f, emissive: 0xae5f1f, emissiveIntensity: 0.8, metalness: 0.3, roughness: 0.3 });
+
+  function spawnObstacleRow(z) {
+    // Decide pattern: sometimes a full-width hurdle (jump), sometimes 1-2 lane crates (dodge)
+    const pattern = Math.random();
+    if (pattern < difficulty.hurdleChance) {
+      // jumpable hurdle across all lanes
+      const geo = new THREE.BoxGeometry(7.4, 0.55, 0.5);
+      const mesh = new THREE.Mesh(geo, hurdleMat);
+      mesh.position.set(0, 0.28, z);
+      mesh.castShadow = true;
+      mesh.userData = {
+        type: 'hurdle', lanes: [0,1,2], z,
+        halfDepth: 0.25, halfWidth: 3.7,
+        bottomY: 0.005, topY: 0.555
+      };
+      scene.add(mesh);
+      obstacles.push(mesh);
+    } else {
+      // 1 or 2 lane crates, must switch lane
+      const blockCount = Math.random() < difficulty.doubleChance ? 2 : 1;
+      const lanesUsed = [];
+      while (lanesUsed.length < blockCount) {
+        const l = Math.floor(Math.random() * LANE_COUNT);
+        if (!lanesUsed.includes(l)) lanesUsed.push(l);
+      }
+      lanesUsed.forEach((l) => {
+        const geo = new THREE.BoxGeometry(1.5, 0.95, 1.1);
+        const mesh = new THREE.Mesh(geo, crateMat);
+        mesh.position.set(LANE_X[l], 0.475, z);
+        mesh.castShadow = true;
+        mesh.userData = {
+          type: 'crate', lanes: [l], z,
+          halfDepth: 0.55, halfWidth: 0.75,
+          bottomY: 0, topY: 0.95
+        };
+        scene.add(mesh);
+        obstacles.push(mesh);
+      });
+    }
+
+    // coins: spawn in a lane not blocked, small chance of a coin arc
+    if (Math.random() < 0.7) {
+      const freeLanes = [0,1,2];
+      const coinLane = freeLanes[Math.floor(Math.random() * freeLanes.length)];
+      for (let i = 0; i < 3; i++) {
+        const cGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.07, 16);
+        const c = new THREE.Mesh(cGeo, coinMat);
+        c.rotation.x = Math.PI / 2;
+        c.position.set(LANE_X[coinLane], 1.0, z + 6 + i * 1.3);
+        c.castShadow = true;
+        c.userData = { lane: coinLane, z: c.position.z, collected: false };
+        scene.add(c);
+        coins.push(c);
+      }
+    }
+
+    // occasional shield / magnet pickup, placed just clear of the obstacle row
+    if (Math.random() < 0.13) {
+      const isShield = Math.random() < 0.5;
+      const geo = isShield ? new THREE.OctahedronGeometry(0.32, 0) : new THREE.TorusGeometry(0.26, 0.11, 10, 20);
+      const mesh = new THREE.Mesh(geo, isShield ? shieldPickupMat : magnetPickupMat);
+      const lane = Math.floor(Math.random() * LANE_COUNT);
+      mesh.position.set(LANE_X[lane], 1.15, z + 3.2);
+      mesh.castShadow = true;
+      mesh.userData = { kind: isShield ? 'shield' : 'magnet', lane, collected: false };
+      scene.add(mesh);
+      powerups.push(mesh);
+    }
+  }
+
+  function resetWorld() {
+    obstacles.forEach(o => scene.remove(o));
+    coins.forEach(c => scene.remove(c));
+    powerups.forEach(p => scene.remove(p));
+    particles.forEach(p => scene.remove(p));
+    obstacles.length = 0;
+    coins.length = 0;
+    powerups.length = 0;
+    particles.length = 0;
+    nextSpawnZ = -14;
+    playerZ = 0;
+    currentLane = 1;
+    targetX = LANE_X[1];
+    velY = 0;
+    grounded = true;
+    baseSpeed = difficulty.baseSpeed;
+    speed = baseSpeed;
+    nextMilestone = 250;
+    distance = 0;
+    score = 0;
+    coinScore = 0;
+    runCoins = 0;
+    coinHudEl.textContent = '0';
+    combo = 1;
+    comboTimer = 0;
+    runTime = 0;
+    shakeTime = 0;
+    currentZone = 0;
+    crashing = false;
+    deathCamTimer = 0;
+    slowMoTimer = 0;
+    timeScale = 1;
+    tensionVignette.style.opacity = 0;
+    closeCallFlash.classList.remove('flash');
+    shieldActive = ownedPerks.has('perk_headstart'); // head-start-shield perk
+    shieldMesh.visible = shieldActive;
+    magnetTimer = 0;
+    extraLifeAvailable = ownedPerks.has('perk_extralife');
+    updatePowerupHUD();
+    player.position.set(0, 0, 0);
+    applySkin(equipped.skin);
+    applyHat(equipped.hat);
+    groundTiles.forEach((tile, i) => {
+      tile.position.z = -i * TILE_LEN;
+      (tile.userData.strips || []).forEach(s => s.position.z = tile.position.z);
+      (tile.userData.rails || []).forEach(r => r.position.z = tile.position.z);
+    });
+  }
+
+  // ---------- Input ----------
+  function moveLeft() {
+    if (!running || gameOver) return;
+    if (currentLane > 0) { currentLane--; targetX = LANE_X[currentLane]; }
+  }
+  function moveRight() {
+    if (!running || gameOver) return;
+    if (currentLane < LANE_COUNT - 1) { currentLane++; targetX = LANE_X[currentLane]; }
+  }
+  function doJump() {
+    if (!running || gameOver) return;
+    if (grounded) { velY = JUMP_FORCE; grounded = false; sndJump(); }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowLeft','a','A'].includes(e.key)) moveLeft();
+    else if (['ArrowRight','d','D'].includes(e.key)) moveRight();
+    else if (['ArrowUp','w','W',' '].includes(e.key)) { e.preventDefault(); doJump(); }
+  });
+
+  document.getElementById('leftBtn').addEventListener('touchstart', (e) => { e.preventDefault(); moveLeft(); });
+  document.getElementById('rightBtn').addEventListener('touchstart', (e) => { e.preventDefault(); moveRight(); });
+  document.getElementById('jumpBtn').addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
+  document.getElementById('leftBtn').addEventListener('mousedown', moveLeft);
+  document.getElementById('rightBtn').addEventListener('mousedown', moveRight);
+  document.getElementById('jumpBtn').addEventListener('mousedown', doJump);
+
+  // swipe detection on canvas
+  let touchStartX = null, touchStartY = null, touchStartT = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    const t = e.changedTouches[0];
+    touchStartX = t.clientX; touchStartY = t.clientY; touchStartT = Date.now();
+  }, { passive: true });
+  canvas.addEventListener('touchend', (e) => {
+    if (touchStartX === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    const dt = Date.now() - touchStartT;
+    if (dt < 500) {
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0) moveRight(); else moveLeft();
+      } else if (dy < -30 && Math.abs(dy) > Math.abs(dx)) {
+        doJump();
+      } else if (Math.abs(dx) < 25 && Math.abs(dy) < 25) {
+        doJump();
+      }
+    }
+    touchStartX = null;
+  }, { passive: true });
+
+  // ---------- Collision helpers ----------
+  const PLAYER_HALF_WIDTH = 0.32;
+  const PLAYER_HALF_DEPTH = 0.2;
+
+  function checkCollisions() {
+    const playerBottom = player.position.y;
+    const playerTop = player.position.y + PLAYER_HEIGHT;
+    for (let i = 0; i < obstacles.length; i++) {
+      const o = obstacles[i];
+      const d = o.userData;
+
+      // Z overlap (depth)
+      const dz = Math.abs(o.position.z - playerZ);
+      if (dz > d.halfDepth + PLAYER_HALF_DEPTH) continue;
+
+      // X overlap (width / lane) — small forgiveness buffer here too
+      const dx = Math.abs(o.position.x - player.position.x);
+      if (dx > d.halfWidth + PLAYER_HALF_WIDTH - COLLISION_FORGIVENESS) continue;
+
+      // Y overlap (height) — only a hit if the player's body actually
+      // intersects the obstacle's vertical span, so a real cleared jump
+      // never registers as a loss. A small forgiveness buffer favors the
+      // player on close calls.
+      if (playerTop < d.bottomY || playerBottom > d.topY - COLLISION_FORGIVENESS) continue;
+
+      return o;
+    }
+    return null;
+  }
+
+  // Detects a genuinely close call — cleared an obstacle with only a thin
+  // margin to spare — and triggers a brief cinematic slow-mo as a reward
+  // for good timing. Purely cosmetic: never affects hit/no-hit outcomes.
+  const NEAR_MISS_ZONE = 0.4;
+  const NEAR_MISS_HEIGHT = 0.32;
+  function checkNearMiss() {
+    const playerBottom = player.position.y;
+    for (let i = 0; i < obstacles.length; i++) {
+      const o = obstacles[i];
+      if (o.userData.nearMissDone) continue;
+      const d = o.userData;
+      const dz = Math.abs(o.position.z - playerZ);
+      if (dz > d.halfDepth + PLAYER_HALF_DEPTH + NEAR_MISS_ZONE) continue;
+      const dx = Math.abs(o.position.x - player.position.x);
+      if (dx > d.halfWidth + PLAYER_HALF_WIDTH + NEAR_MISS_ZONE) continue;
+
+      const clearance = playerBottom - d.topY;
+      if (clearance >= -COLLISION_FORGIVENESS && clearance < NEAR_MISS_HEIGHT) {
+        o.userData.nearMissDone = true;
+        triggerNearMiss();
+      } else if (dz < 0.15) {
+        o.userData.nearMissDone = true; // fully passed without qualifying — stop checking it
+      }
+    }
+  }
+
+  function triggerNearMiss() {
+    slowMoTimer = 0.42;
+    sndNearMiss();
+    showBonus('CLOSE CALL!');
+    closeCallFlash.classList.remove('flash');
+    void closeCallFlash.offsetWidth; // restart the CSS animation
+    closeCallFlash.classList.add('flash');
+  }
+
+  function checkCoins() {
+    for (let i = coins.length - 1; i >= 0; i--) {
+      const c = coins[i];
+      if (c.userData.collected) continue;
+      const dz = Math.abs(c.position.z - playerZ);
+      if (dz < 0.7 && Math.abs(c.position.x - player.position.x) < 0.55 && player.position.y < 1.6) {
+        c.userData.collected = true;
+        scene.remove(c);
+        comboTimer = 2.0;
+        combo = Math.min(combo + 1, 9);
+        coinScore += 10 * combo;
+        runCoins++;
+        totalCoinsCollected++;
+        coinWallet += Math.round(1 * coinMultiplier);
+        coinHudEl.textContent = runCoins;
+        sndCoin();
+        spawnBurst(c.position, 0xffd700, 8, 0.1);
+        showCombo();
+      }
+    }
+  }
+
+  function checkPowerups() {
+    for (let i = powerups.length - 1; i >= 0; i--) {
+      const p = powerups[i];
+      if (p.userData.collected) continue;
+      const dz = Math.abs(p.position.z - playerZ);
+      if (dz < 0.75 && Math.abs(LANE_X[p.userData.lane] - player.position.x) < 0.55 && player.position.y < 1.7) {
+        p.userData.collected = true;
+        scene.remove(p);
+        sndPowerup();
+        if (p.userData.kind === 'shield') {
+          shieldActive = true;
+          shieldMesh.visible = true;
+          spawnBurst(p.position, 0x3fa9ff, 14, 0.16);
+          showBonus('SHIELD READY');
+        } else {
+          magnetTimer = 7;
+          spawnBurst(p.position, 0xff9d3f, 14, 0.16);
+          showBonus('MAGNET ON!');
+        }
+        updatePowerupHUD();
+      }
+    }
+  }
+
+  let comboFadeTimeout = null;
+  function showCombo() {
+    comboEl.textContent = 'COMBO x' + combo;
+    comboEl.style.opacity = '1';
+    comboEl.style.transform = 'translateX(-50%) scale(1.15)';
+    clearTimeout(comboFadeTimeout);
+    comboFadeTimeout = setTimeout(() => {
+      comboEl.style.transform = 'translateX(-50%) scale(1)';
+    }, 120);
+  }
+
+  // ---------- Screens ----------
+  const startScreen = document.getElementById('startScreen');
+  const gameOverScreen = document.getElementById('gameOverScreen');
+  const shopScreen = document.getElementById('shopScreen');
+  const finalScoreEl = document.getElementById('finalScore');
+  const newBestEl = document.getElementById('newBest');
+  let shopReturnScreen = startScreen;
+
+  function updateWalletDisplays() {
+    document.getElementById('walletValStart').textContent = coinWallet;
+    document.getElementById('walletValGO').textContent = coinWallet;
+    document.getElementById('shopWalletVal').textContent = coinWallet;
+  }
+
+  function recomputeCoinMultiplier() {
+    coinMultiplier = ownedPerks.has('perk_coinboost25') ? 1.25 : (ownedPerks.has('perk_coinboost10') ? 1.1 : 1);
+  }
+
+  function buyItem(item) {
+    const isPerk = item.category === 'perk';
+    const owned = isPerk ? ownedPerks.has(item.id) : ownedItems.has(item.id);
+    if (owned) {
+      if (!isPerk) { equipped[item.category] = item.id; applyEquippedCosmetic(item.category); }
+      renderShop();
+      return;
+    }
+    if (coinWallet < item.price) return; // can't afford — button is disabled anyway
+    coinWallet -= item.price;
+    if (isPerk) {
+      ownedPerks.add(item.id);
+      if (item.id === 'perk_coinboost10' || item.id === 'perk_coinboost25') recomputeCoinMultiplier();
+    } else {
+      ownedItems.add(item.id);
+      equipped[item.category] = item.id;
+      applyEquippedCosmetic(item.category);
+    }
+    sndPowerup();
+    updateWalletDisplays();
+    renderShop();
+  }
+
+  function applyEquippedCosmetic(category) {
+    if (category === 'skin') applySkin(equipped.skin);
+    else if (category === 'hat') applyHat(equipped.hat);
+    // trail and theme are read live from `equipped` each frame — nothing to push
+  }
+
+  function renderShop() {
+    const grid = document.getElementById('shopGrid');
+    grid.innerHTML = '';
+    SHOP_ITEMS.filter(i => i.category === activeShopTab).forEach((item) => {
+      const isPerk = item.category === 'perk';
+      const owned = isPerk ? ownedPerks.has(item.id) : ownedItems.has(item.id);
+      const isEquipped = !isPerk && equipped[item.category] === item.id;
+      const affordable = coinWallet >= item.price;
+
+      const card = document.createElement('div');
+      card.className = 'shop-card' + (owned ? ' owned' : '') + (isEquipped ? ' equipped' : '');
+
+      const swatch = document.createElement('div');
+      swatch.className = 'shop-swatch';
+      swatch.style.background = (item.color !== undefined) ? '#' + item.color.toString(16).padStart(6, '0') : 'rgba(255,255,255,0.08)';
+      swatch.textContent = item.icon || '';
+      card.appendChild(swatch);
+
+      const name = document.createElement('div');
+      name.className = 'shop-name';
+      name.textContent = item.name + (item.desc ? '' : '');
+      card.appendChild(name);
+
+      if (item.desc) {
+        const desc = document.createElement('div');
+        desc.style.cssText = 'font-size:10px; opacity:0.6; min-height:24px; line-height:1.3;';
+        desc.textContent = item.desc;
+        card.appendChild(desc);
+      }
+
+      const price = document.createElement('div');
+      price.className = 'shop-price';
+      price.textContent = item.price > 0 ? ('🪙 ' + item.price.toLocaleString()) : 'FREE';
+      card.appendChild(price);
+
+      const btn = document.createElement('button');
+      if (isPerk) {
+        btn.className = 'shop-buy-btn ' + (owned ? 'owned-tag' : (affordable ? 'can-buy' : 'locked'));
+        btn.textContent = owned ? 'OWNED' : (affordable ? 'BUY' : 'LOCKED');
+        btn.disabled = owned || !affordable;
+      } else if (isEquipped) {
+        btn.className = 'shop-buy-btn equipped-tag';
+        btn.textContent = 'EQUIPPED';
+        btn.disabled = true;
+      } else if (owned) {
+        btn.className = 'shop-buy-btn equip';
+        btn.textContent = 'EQUIP';
+      } else {
+        btn.className = 'shop-buy-btn ' + (affordable ? 'can-buy' : 'locked');
+        btn.textContent = affordable ? 'BUY' : 'LOCKED';
+        btn.disabled = !affordable;
+      }
+      btn.addEventListener('click', () => buyItem(item));
+      card.appendChild(btn);
+
+      grid.appendChild(card);
+    });
+  }
+
+  function openShop(fromScreen) {
+    shopReturnScreen = fromScreen;
+    fromScreen.classList.add('hidden');
+    shopScreen.classList.remove('hidden');
+    updateWalletDisplays();
+    renderShop();
+  }
+  document.getElementById('openShopBtn').addEventListener('click', () => openShop(startScreen));
+  document.getElementById('openShopBtnGO').addEventListener('click', () => openShop(gameOverScreen));
+  document.getElementById('closeShopBtn').addEventListener('click', () => {
+    shopScreen.classList.add('hidden');
+    shopReturnScreen.classList.remove('hidden');
+  });
+  document.querySelectorAll('.shop-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('selected'));
+      tab.classList.add('selected');
+      activeShopTab = tab.dataset.cat;
+      renderShop();
+    });
+  });
+
+  function startGame() {
+    ensureAudio();
+    resetWorld();
+    document.getElementById('diffVal').textContent = difficulty.label;
+    for (let i = 0; i < 5; i++) {
+      spawnObstacleRow(nextSpawnZ);
+      nextSpawnZ -= difficulty.spawnGap + Math.random() * 4;
+    }
+    running = true;
+    gameOver = false;
+    startScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+  }
+
+  function endGame() {
+    running = false;
+    gameOver = true;
+    if (score > best) { best = score; bestVal.textContent = best; }
+    if (distance > bestDistance) bestDistance = distance;
+    if (combo > bestCombo) bestCombo = combo;
+    if (runCoins > bestRunCoins) bestRunCoins = runCoins;
+
+    finalScoreEl.textContent = score;
+    newBestEl.textContent = (score >= best && score > 0) ? '★ NEW BEST ★' : '';
+    document.getElementById('finalDist').textContent = Math.floor(distance) + 'm';
+    document.getElementById('finalCombo').textContent = 'x' + bestCombo;
+    document.getElementById('finalCoins').textContent = runCoins;
+    document.getElementById('totalCoinsVal').textContent = totalCoinsCollected;
+    document.getElementById('bestCoinsVal').textContent = bestRunCoins;
+    gameOverTauntEl.textContent = randomTaunt(gameOverTauntEl.textContent);
+    updateWalletDisplays();
+    setTimeout(() => gameOverScreen.classList.remove('hidden'), 250);
+  }
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('restartBtn').addEventListener('click', startGame);
+  updateWalletDisplays();
+
+  // ---------- Animation loop ----------
+  let lastTime = performance.now();
+  let hitFlash = 0;
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const rawDt = Math.min((now - lastTime) / 16.67, 3);
+    lastTime = now;
+
+    // ease timeScale toward its target — down sharply into a near-miss
+    // slow-mo, back up smoothly once it lapses, so the effect reads as a
+    // deliberate cinematic beat rather than a stutter
+    if (slowMoTimer > 0) {
+      slowMoTimer -= rawDt / 60;
+      timeScale += (0.3 - timeScale) * 0.35;
+    } else {
+      timeScale += (1 - timeScale) * 0.12;
+    }
+    const dt = rawDt * timeScale;
+
+    if (running && !gameOver && !crashing) {
+      runTime += dt;
+      speed = baseSpeed + Math.min(runTime * difficulty.rampRate, 0.22);
+      speedVal.textContent = (speed / baseSpeed).toFixed(1) + 'x';
+
+      playerZ -= speed * dt;
+      distance += speed * dt;
+      player.position.z = playerZ;
+
+      // lane lerp
+      player.position.x += (targetX - player.position.x) * Math.min(0.22 * dt, 1);
+      // slight tilt when turning
+      player.rotation.z = (targetX - player.position.x) * -0.15;
+
+      // jump physics — full-strength gravity on the way up and down,
+      // but a brief hang near the peak so the arc reads as smooth and
+      // controlled rather than a sharp in-and-out hop
+      const gScale = (!grounded && Math.abs(velY) < APEX_HANG_VEL) ? APEX_GRAVITY_SCALE : 1;
+      velY += GRAVITY * gScale * dt;
+      player.position.y += velY * dt;
+      if (player.position.y <= 0) {
+        player.position.y = 0;
+        velY = 0;
+        grounded = true;
+      }
+
+      // run animation
+      const runSpeedAnim = grounded ? (0.25 + speed * 1.2) : 0.08;
+      const t = runTime * runSpeedAnim;
+      if (grounded) {
+        legPivotL.rotation.x = Math.sin(t) * 0.9;
+        legPivotR.rotation.x = -Math.sin(t) * 0.9;
+        armPivotL.rotation.x = -Math.sin(t) * 0.7;
+        armPivotR.rotation.x = Math.sin(t) * 0.7;
+      } else {
+        legPivotL.rotation.x += (0.3 - legPivotL.rotation.x) * 0.1;
+        legPivotR.rotation.x += (-0.3 - legPivotR.rotation.x) * 0.1;
+        armPivotL.rotation.x += (-0.5 - armPivotL.rotation.x) * 0.1;
+        armPivotR.rotation.x += (0.5 - armPivotR.rotation.x) * 0.1;
+      }
+
+      // shop cosmetics — trail particles + animated skins
+      trailTimer -= dt;
+      if (trailTimer <= 0 && equipped.trail !== 'trail_none') {
+        spawnTrailParticle();
+        trailTimer = 0.07;
+      }
+      if (equipped.skin === 'skin_rainbow') {
+        suit.color.setHSL((runTime * 0.01) % 1, 0.85, 0.55);
+        suitDark.color.setHSL((runTime * 0.01) % 1, 0.7, 0.2);
+      } else if (equipped.skin === 'skin_golden') {
+        suit.emissiveIntensity = 0.7 + Math.sin(runTime * 0.15) * 0.25;
+      }
+
+      // spawn management
+      if (nextSpawnZ > playerZ - 55) {
+        spawnObstacleRow(nextSpawnZ);
+        nextSpawnZ -= Math.max(6, difficulty.spawnGap - runTime * 0.005);
+      }
+
+      // cleanup passed obstacles/coins, award a small "cleared it" bonus,
+      // and flag a bigger bonus for hurdles you actually jumped over
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const o = obstacles[i];
+        if (!o.userData.passed && o.position.z > playerZ) {
+          o.userData.passed = true;
+          coinScore += o.userData.type === 'hurdle' ? 12 : 8;
+          if (o.userData.type === 'hurdle') { showBonus('NICE JUMP! +12'); sndBonus(); }
+        }
+        if (o.position.z > playerZ + 4) {
+          scene.remove(o);
+          obstacles.splice(i, 1);
+        }
+      }
+      for (let i = coins.length - 1; i >= 0; i--) {
+        const c = coins[i];
+        c.rotation.z += 0.08 * dt;
+        c.position.y = 1.0 + Math.sin(runTime * 0.1 + c.position.z) * 0.08;
+        // magnet pulls nearby coins toward the player
+        if (magnetTimer > 0 && !c.userData.collected) {
+          const dxm = player.position.x - c.position.x;
+          const dzm = playerZ - c.position.z;
+          if (Math.sqrt(dxm * dxm + dzm * dzm) < currentMagnetRadius()) {
+            c.position.x += dxm * 0.16 * dt;
+            c.position.z += dzm * 0.16 * dt;
+          }
+        }
+        if (c.position.z > playerZ + 4 || c.userData.collected) {
+          scene.remove(c);
+          coins.splice(i, 1);
+        }
+      }
+      for (let i = powerups.length - 1; i >= 0; i--) {
+        const p = powerups[i];
+        p.rotation.y += 0.06 * dt;
+        p.position.y = 1.15 + Math.sin(runTime * 0.09 + p.position.z) * 0.08;
+        if (p.position.z > playerZ + 4 || p.userData.collected) {
+          scene.remove(p);
+          powerups.splice(i, 1);
+        }
+      }
+
+      if (magnetTimer > 0) {
+        magnetTimer -= dt / 60;
+        if (magnetTimer <= 0) { magnetTimer = 0; }
+        updatePowerupHUD();
+      }
+
+      recycleGround(playerZ);
+      skylineGroup.position.z = 0;
+
+      // combo timer decay
+      if (comboTimer > 0) {
+        comboTimer -= dt * (1/60);
+        if (comboTimer <= 0) {
+          combo = 1;
+          comboEl.style.opacity = '0';
+        }
+      }
+
+      checkCoins();
+      checkPowerups();
+      checkNearMiss();
+      const hitObstacle = checkCollisions();
+      if (hitObstacle) {
+        if (shieldActive) {
+          // shield absorbs one hit: consume it and clear the obstacle instead of ending the run
+          shieldActive = false;
+          shieldMesh.visible = false;
+          updatePowerupHUD();
+          scene.remove(hitObstacle);
+          const idx = obstacles.indexOf(hitObstacle);
+          if (idx > -1) obstacles.splice(idx, 1);
+          spawnBurst(player.position.clone().add(new THREE.Vector3(0, 1.1, 0)), 0x3fa9ff, 20, 0.2);
+          sndPowerup();
+          showBonus('SHIELD BROKE!');
+          shakeTime = 0.22;
+        } else if (extraLifeAvailable) {
+          // extra-life perk: survive one crash per run, consumed here
+          extraLifeAvailable = false;
+          scene.remove(hitObstacle);
+          const idx2 = obstacles.indexOf(hitObstacle);
+          if (idx2 > -1) obstacles.splice(idx2, 1);
+          spawnBurst(player.position.clone().add(new THREE.Vector3(0, 1.1, 0)), 0xff5fd1, 24, 0.22);
+          sndPowerup();
+          showBonus('EXTRA LIFE USED!');
+          shakeTime = 0.3;
+        } else {
+          hitFlash = 1;
+          shakeTime = 0.4;
+          sndCrash();
+          spawnBurst(player.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff5a5a, 22, 0.22);
+          if (navigator.vibrate) navigator.vibrate(200);
+          crashing = true;
+          deathCamTimer = 0.85;
+          slowMoTimer = 0.85;
+        }
+      }
+
+      // score: distance-based score plus accumulated coin/bonus score (fixed — no longer compounds itself)
+      score = Math.floor(distance * 3) + coinScore;
+      scoreVal.textContent = score;
+
+      // distance milestones — a little "you're doing great" nudge to keep runs going
+      if (distance >= nextMilestone) {
+        showBonus(nextMilestone + 'm!');
+        sndBonus();
+        nextMilestone += 250;
+      }
+      if (combo > bestCombo) bestCombo = combo;
+
+      // zone / palette progression every ~350 units of distance
+      const paletteLen = THEME_PALETTES[equipped.theme] ? THEME_PALETTES[equipped.theme].length : ZONE_PALETTES.length;
+      const zoneIndex = Math.floor(distance / 350) % paletteLen;
+      if (zoneIndex !== currentZone) {
+        currentZone = zoneIndex;
+        zoneVal.textContent = currentZone + 1;
+        showBonus('ZONE ' + (currentZone + 1) + '!');
+      }
+      const targetPalette = getActivePalette(currentZone);
+      curBG.lerp(new THREE.Color(targetPalette.bg), 0.02 * dt);
+      curAccent.lerp(new THREE.Color(targetPalette.accent), 0.02 * dt);
+      scene.background.copy(curBG);
+      scene.fog.color.copy(curBG);
+      sharedRailMat.color.copy(curAccent);
+      sharedRailMat.emissive.copy(curAccent);
+      pinkLight.color.copy(curAccent);
+
+      // camera follow
+      const camTargetX = player.position.x * 0.4;
+      camera.position.x += (camTargetX - camera.position.x) * 0.08 * dt;
+      camera.position.y += ((3.4 + player.position.y * 0.3) - camera.position.y) * 0.08 * dt;
+      camera.position.z = playerZ + 6.4;
+      camera.lookAt(player.position.x * 0.5, player.position.y + 1.1, playerZ - 6);
+
+      // screen shake feedback on hits
+      if (shakeTime > 0) {
+        shakeTime -= dt / 60;
+        const mag = 0.18;
+        camera.position.x += (Math.random() - 0.5) * mag;
+        camera.position.y += (Math.random() - 0.5) * mag;
+      }
+
+      pinkLight.position.z = playerZ - 4;
+    }
+
+    // cinematic beat after a crash: camera drifts back and up over the
+    // fallen player in slow-mo before the game-over screen appears
+    if (crashing) {
+      deathCamTimer -= rawDt / 60;
+      const t = 1 - Math.max(0, deathCamTimer / 0.85);
+      camera.position.x += (player.position.x * 0.4 + Math.sin(t * 6) * 0.3 - camera.position.x) * 0.06;
+      camera.position.y += ((3.4 + 1.6 * t) - camera.position.y) * 0.06;
+      camera.position.z += ((playerZ + 6.4 + 2.4 * t) - camera.position.z) * 0.06;
+      camera.lookAt(player.position.x * 0.5, player.position.y + 1.0, playerZ - 4);
+      if (deathCamTimer <= 0) {
+        crashing = false;
+        endGame();
+      }
+    }
+
+    // rising tension vignette — a subtle red pulse that grows with speed,
+    // pulsing faster the closer you are to top speed
+    if (running && !gameOver) {
+      const speedRatio = Math.min(1, (speed - baseSpeed) / 0.22);
+      const pulse = 0.55 + 0.45 * Math.sin(runTime * (0.08 + speedRatio * 0.18));
+      tensionVignette.style.opacity = (speedRatio * 0.7 * pulse).toFixed(3);
+    } else if (!crashing) {
+      tensionVignette.style.opacity = 0;
+    }
+
+    updateParticles(dt);
+
+    // hit flash fade
+    if (hitFlash > 0) {
+      hitFlash -= 0.03 * dt;
+      renderer.setClearColor(new THREE.Color(1, 0.2, 0.2).multiplyScalar(Math.max(hitFlash,0)).add(curBG));
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  // initial camera position
+  camera.position.set(0, 3.4, 6.4);
+  camera.lookAt(0, 1, -6);
+
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
